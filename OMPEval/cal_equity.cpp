@@ -6,7 +6,7 @@ extern "C" {
 #include <fstream>
 int main()
 {
-if (0) {
+if (1) {
     std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
     hand_indexer_t flop_indexer;
     uint8_t cards_per_round[] = {2, 3};
@@ -37,7 +37,7 @@ if (0) {
     out.close();
 }
 
-if (0) {
+if (1) {
     std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
     hand_indexer_t turn_indexer;
     uint8_t cards_per_round[] = {2, 3, 1};
