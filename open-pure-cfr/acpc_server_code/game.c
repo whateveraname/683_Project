@@ -490,6 +490,24 @@ uint8_t currentPlayer( const Game *game, const State *state )
 		     + game->numPlayers - 1 );
 }
 
+uint8_t numPlayerRaisesInGame( const Game *game, const State *state )
+{
+  int i, j;
+  uint8_t ret;
+
+  ret = 0;
+  for( i = 0; i < state->round; ++i ) {
+    for( j = 0; j < state->numActions[ i ]; ++j ) {
+      if( state->actingPlayer[i][j] == currentPlayer(game, state) && state->action[ i ][ j ].type == a_raise ) {
+        ++ret;
+      }
+    }
+  }
+  assert(ret <= 4);
+
+  return ret;
+}
+
 uint8_t numRaises( const State *state )
 {
   int i;
@@ -792,6 +810,12 @@ int raiseIsValid( const Game *game, const State *curState,
 
   if( numRaises( curState ) >= game->maxRaises[ curState->round ] ) {
     /* already made maximum number of raises */
+
+    return 0;
+  }
+
+  if( numPlayerRaisesInGame( game, curState ) >= 4 ) {
+    /* current player has 4 raises already */
 
     return 0;
   }
@@ -1237,6 +1261,8 @@ static int printBetting( const Game *game, const State *state,
   int i, a, c, r;
 
   c = 0;
+  string[ c ] = '/';
+  ++c;
   for( i = 0; i <= state->round; ++i ) {
 
     /* print state separator */
@@ -1550,11 +1576,11 @@ static int printStateCommon( const Game *game, const State *state,
   c = 0;
 
   /* HEADER:handId: */
-  r = snprintf( &string[ c ], maxLen - c, ":%"PRIu32":", state->handId );
-  if( r < 0 ) {
-    return -1;
-  }
-  c += r;
+  // r = snprintf( &string[ c ], maxLen - c, "%"PRIu32"", state->handId );
+  // if( r < 0 ) {
+  //   return -1;
+  // }
+  // c += r;
 
   /* HEADER:handId:betting */
   r = printBetting( game, state, maxLen - c, &string[ c ] );
@@ -1581,11 +1607,11 @@ int printState( const Game *game, const State *state,
   c = 0;
 
   /* STATE */
-  r = snprintf( &string[ c ], maxLen - c, "STATE" );
-  if( r < 0 ) {
-    return -1;
-  }
-  c += r;
+  // r = snprintf( &string[ c ], maxLen - c, "STATE" );
+  // if( r < 0 ) {
+  //   return -1;
+  // }
+  // c += r;
 
   /* STATE:handId:betting: */
   r = printStateCommon( game, state, maxLen - c, &string[ c ] );

@@ -339,6 +339,11 @@ void PlayerModule::get_action_probs( State &state,
 							       num_choices,
 							       pos_entries );
 
+  if (bucket == 0) {
+    fprintf( stdout, "%ld\n", soln_idx);
+    fflush( stdout );
+  }
+
   /* Get the abstract game action probabilities */
   if( sum_pos_entries == 0 ) {
     if( verbose ) {

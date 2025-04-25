@@ -17,8 +17,8 @@ extern "C" {
 }
 
 /* Pure CFR includes */
-#include "constants.hpp"
-#include "player_module.hpp"
+#include "../constants.hpp"
+#include "../player_module.hpp"
 
 static void print_strategy_r( PlayerModule &player_module,
 			      State &state,
@@ -48,7 +48,9 @@ static void print_strategy_r( PlayerModule &player_module,
 	break;
       }
     }
-    printf( "%s\n", state_str );
+    // Print the state string and flush
+    printf( "%s ", state_str );
+    fflush( stdout );
   
     /* Print the player's action probabilities for every possible bucket */
     const int num_buckets = ag->card_abs->num_buckets( ag->game, state );
@@ -59,6 +61,7 @@ static void print_strategy_r( PlayerModule &player_module,
       player_module.get_action_probs( state, action_probs, bucket );
 
       /* Print 'em out */
+    if (bucket == 0) {
       printf( "  Bucket %d:", bucket );
       for( int a = 0; a < num_choices; ++a ) {
 	if( ( num_choices < 5 ) || ( action_probs[ a ] > 0.001 ) ) {
@@ -68,6 +71,7 @@ static void print_strategy_r( PlayerModule &player_module,
 	}
       }
       printf( "\n" );
+    }
     }
   }
 
@@ -123,7 +127,7 @@ int main( const int argc, const char *argv[] )
   State state;
   for( int p = 0; p < ag->game->numPlayers; ++p ) {
     initState( ag->game, 0, &state );
-    printf( "=== PLAYER %d ===\n", p + 1 );
+    // printf( "=== PLAYER %d ===\n", p + 1 );
     print_strategy_r( player_module, state, ag, p, max_round );
   }
 
