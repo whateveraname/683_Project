@@ -131,4 +131,9 @@ void AbstractGame::count_entries( size_t num_entries_per_bucket[ MAX_ROUNDS ],
 				  size_t total_num_entries[ MAX_ROUNDS ] ) const
 {
   count_entries_r( betting_tree_root, num_entries_per_bucket, total_num_entries );
+  // print num_entries_per_bucket and total_num_entries
+  for( int r = 0; r < game->numRounds; ++r ) {
+    fprintf( stderr, "Round %d: num_entries_per_bucket=%zu, total_num_entries=%zu\n",
+       r, num_entries_per_bucket[ r ], total_num_entries[ r ] );
+  }
 }

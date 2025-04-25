@@ -28,11 +28,13 @@ file(GLOB CFR_SOURCES ./*.cpp)
 add_library(C_Library OBJECT ${HAND_ISOMORPHISM_SOURCES} ${ACPC_SOURCES})
 set_target_properties(C_Library PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-# Add the main source file
-set(MAIN_SOURCE main/pure_cfr.cpp)
+add_subdirectory(pybind11)
 
 # Define the executable
-add_executable(pure_cfr ${MAIN_SOURCE} ${CFR_SOURCES} $<TARGET_OBJECTS:C_Library>)
+add_executable(pure_cfr main/pure_cfr.cpp ${CFR_SOURCES} $<TARGET_OBJECTS:C_Library>)
+add_executable(print_player_strategy main/print_player_strategy.cpp ${CFR_SOURCES} $<TARGET_OBJECTS:C_Library>)
 
 find_package(Threads REQUIRED)
 target_link_libraries(pure_cfr PRIVATE Threads::Threads)
+
+pybind11_add_module(strategy_parser python/mod.cpp ${CFR_SOURCES} $<TARGET_OBJECTS:C_Library>)
