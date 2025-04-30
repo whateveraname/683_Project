@@ -16,10 +16,10 @@ namespace py = pybind11;
 
 class StrategyParser {
 public:
-    StrategyParser(const std::string& strategy_file, const std::string& pos_table_file) {
+    StrategyParser(const std::string& strategy_file, const std::string& pos_table_file, const std::string& bucket_table_path) {
         load_strategy(strategy_file);
         load_pos_table(pos_table_file);
-        load_bucket_table();
+        load_bucket_table(bucket_table_path);
     }
 
     int parse(const std::string& state, const std::string& hand, int num_actions) {
@@ -30,10 +30,11 @@ public:
                 num_rounds++;
             }
         }
-        int probs[num_actions];
+        uint64_t probs[num_actions];
         int bucket = hand_to_bucket(hand, num_rounds);
         get_action_probs(state, bucket, num_rounds, num_actions, probs);
         // Print action probabilities
+        // std::cout << bucket << std::endl;
         // std::cout << "Action probabilities for state: " << state << ", hand: " << hand << std::endl;
         // for (int i = 0; i < num_actions; ++i) {
         //     std::cout << "Action " << i << ": " << probs[i] << std::endl;
@@ -114,7 +115,7 @@ protected:
         }
     }
 
-    void get_action_probs(const std::string& state, int bucket, int round, int num_actions, int* probs) {
+    void get_action_probs(const std::string& state, int bucket, int round, int num_actions, uint64_t* probs) {
         switch (round) {
             case 1:
                 // Preflop
@@ -222,18 +223,18 @@ protected:
         file.close();
     }
 
-    void load_bucket_table() {
+    void load_bucket_table(const std::string& bucket_table_path) {
         uint8_t cards_per_round[] = {2, 3, 1, 1};
         for (int i = 0; i < 4; i++) {
             hand_indexer_init(i + 1, cards_per_round, &indexers[i]);
         }
-        flop_bucket_table.open("/mnt/nfs/work1/ameli/yanqichen/flop_bucket_table.bin", std::ios::binary);
+        flop_bucket_table.open(bucket_table_path + "flop_bucket_table.bin", std::ios::binary);
         if (!flop_bucket_table) {
             std::cout << "Error opening file: flop_bucket_table.bin" << std::endl;
             return;
         }
-        turn_bucket_table.open("/mnt/nfs/work1/ameli/yanqichen/turn_bucket_table.bin", std::ios::binary);
-        river_bucket_table.open("/mnt/nfs/work1/ameli/yanqichen/river_bucket_table.bin", std::ios::binary);
+        turn_bucket_table.open(bucket_table_path + "turn_bucket_table.bin", std::ios::binary);
+        river_bucket_table.open(bucket_table_path + "river_bucket_table.bin", std::ios::binary);
     }
 
     std::vector<uint64_t> preflop;
@@ -251,6 +252,6 @@ protected:
 
 PYBIND11_MODULE(strategy_parser, m) {
     py::class_<StrategyParser>(m, "StrategyParser")
-        .def(py::init<const std::string&, const std::string&>())
+        .def(py::init<const std::string&, const std::string&, const std::string&>())
         .def("parse", &StrategyParser::parse);
 }
