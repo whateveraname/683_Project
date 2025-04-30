@@ -7,7 +7,10 @@ import strategy_parser as sp
 class CustomPlayer(BasePokerPlayer):
   def __init__(self):
     print("CustomPlayer")
-    self.strategy = sp.StrategyParser("final.iter-46733k.secs-60.avg-strategy", "states.log")
+    # self.strategy = sp.StrategyParser("final.iter-46620k.secs-60.avg-strategy", "states.log")
+    # self.strategy = sp.StrategyParser("final.iter-34107794k.secs-43200.avg-strategy", "states.log")
+    # self.strategy = sp.StrategyParser("final.iter-68351425k.secs-86400.avg-strategy", "states.log")
+    self.strategy = sp.StrategyParser("final.iter-342445386k.secs-432000.avg-strategy", "states.log")
 
   def declare_action(self, valid_actions, hole_card, round_state):
     # time this function
@@ -53,10 +56,20 @@ class CustomPlayer(BasePokerPlayer):
     # print("action_history: ", action_history)
     # print("cards: ", cards)
     # print("valid_actions: ", valid_actions)
-    action = self.strategy.parse(action_history, cards, len(valid_actions))
+    num_valid_actions = len(valid_actions)
+    if action_history[-1] == 'c' or (len(action_history) > 1 and action_history[-2] == 'c' and action_history[-1] == '/'):
+      num_valid_actions -= 1
+    action = self.strategy.parse(action_history, cards, num_valid_actions)
+    if action_history[-1] == 'c' or (len(action_history) > 1 and action_history[-2] == 'c' and action_history[-1] == '/'):
+      action += 1
+    if action >= len(valid_actions):
+      print(valid_actions)
+      print(action_history)
+    result = valid_actions[action]["action"]
+    # print("action: ", result)
     end_time = time.time()
-    print("time taken: ", end_time - start_time)
-    return valid_actions[action]["action"] # action returned here is sent to the poker engine
+    # print("time taken: ", end_time - start_time)
+    return result # action returned here is sent to the poker engine
 
   def receive_game_start_message(self, game_info):
     pass
