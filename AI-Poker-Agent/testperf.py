@@ -87,8 +87,8 @@ def play_games(start_game, num_games, agent_name1, agent1_class, agent_name2, ag
 def testperf(agent_name1, agent1, agent_name2, agent2):		
 
 	# Init to play 500 games of 1000 rounds
-	num_game = 10
-	max_round = 50
+	num_game = 100
+	max_round = 100
 	initial_stack = 1000
 	smallblind_amount = 10
 
@@ -161,7 +161,7 @@ if __name__ == '__main__':
 	start = time.time()
 	# testperf("MCTS Player", CustomPlayer(True), "Base Player", CustomPlayer(False))
     
-	testperf("MCTS Player", CustomPlayer(True), "Base Player", RaisedPlayer())
+	testperf("MCTS Player", CustomPlayer(True), "Base Player", CustomPlayer(False))
 	# testperf("MCTS Player", CustomPlayer(True), "Base Player", CustomPlayer(False))
 	# testperf_mp("MCTS Player", make_mcts_player, "Base Player", make_base_player, total_games=1000, num_processes=20)	
 	end = time.time()

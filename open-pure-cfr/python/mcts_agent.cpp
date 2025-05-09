@@ -14,9 +14,22 @@ MCTSAgent::MCTSAgent(double e, int ms)
 int MCTSAgent::search(const std::string& state, const std::string& hand,
                       int num_actions,
                       int pot_size, int call_amount, int invested,
-                      const std::vector<double>& prior, double fold_p)
+                      const std::vector<double>& prior_input, double fold_p)
 {
+    bool flag = false;
     simulation_count_this_round = 0;
+
+    // Copy prior so we can modify it
+    std::vector<double> prior = prior_input;
+
+    if (!state.empty() && (state.back() == 'c' || (state.size() > 1 && state[state.size() - 2] == 'c' && state.back() == '/')))
+    {
+
+        num_actions = 3;
+        flag = true;
+        prior.insert(prior.begin(), 0.0); // Insert 0.0 at the front
+    }
+
     auto root = std::make_unique<MCTSNode>(state, hand, num_actions, pot_size, call_amount, invested);
     root->prior = prior;
 
@@ -29,14 +42,14 @@ int MCTSAgent::search(const std::string& state, const std::string& hand,
     while (Clock::now() < deadline)
         simulate(root.get(), fold_p);
 
-    std::vector<double> q_values(num_actions, 0.0);  // very low for unvisited
+    std::vector<double> q_values(num_actions, 0.0);
     std::vector<double> probs(num_actions, 0.0);
     double sum_exp = 0.0;
 
     for (int i = 0; i < num_actions; ++i) {
         if (root->visit_count[i] > 0) {
             q_values[i] = root->total_value[i] / root->visit_count[i];
-            std::cout << "Action " << i << ": Q-value = " << q_values[i] << ", Visits = " << root->visit_count[i] << std::endl;
+            // std::cout << "Action " << i << ": Q-value = " << q_values[i] << ", Visits = " << root->visit_count[i] << std::endl;
         }
     }
 
@@ -50,7 +63,8 @@ int MCTSAgent::search(const std::string& state, const std::string& hand,
     }
 
     int best = std::distance(probs.begin(), std::max_element(probs.begin(), probs.end()));
-    return probs[best] > 0.9 ? best : -1;
+
+    return probs[best] > 0.9 ? (flag ? best - 1 : best) : -1;
 }
 
 int MCTSAgent::select_action(MCTSNode* node) {
