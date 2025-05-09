@@ -6,6 +6,9 @@
 #include <cassert>
 #include <numeric>
 #include <cstdlib>
+#include "mcts_agent.h"
+#include <omp.h>
+#include <chrono>
 
 extern "C" {
 #include "../hand-isomorphism/src/hand_index.h"
@@ -29,34 +32,41 @@ public:
         load_strategy(strategy_file);
         load_pos_table(pos_table_file);
         load_bucket_table();
+        mcts_agent = std::make_unique<MCTSAgent>(0.1, 95);
     }
 
-    int parse(const std::string& state, const std::string& hand, int num_actions) {
-        // count number of "/"s in state
-        int num_rounds = 0;
-        for (char c : state) {
-            if (c == '/') {
-                num_rounds++;
-            }
-        }
-        uint64_t probs[num_actions];
+    int parse(const std::string& state, const std::string& hand, int num_actions,
+          bool use_mcts, int pot_size, int call_amount, int invested,
+          bool verbose) {
+        int num_rounds = std::count(state.begin(), state.end(), '/');
+        if (num_rounds <= 2) { use_mcts = false; }
+
         int bucket = hand_to_bucket(hand, num_rounds);
-        get_action_probs(state, bucket, num_rounds, num_actions, probs);
-        // Print action probabilities
-        // std::cout << bucket << std::endl;
-        // std::cout << "Action probabilities for state: " << state << ", hand: " << hand << std::endl;
-        // for (int i = 0; i < num_actions; ++i) {
-        //     std::cout << "Action " << i << ": " << probs[i] << std::endl;
-        // }
-        // return the action with max probability
-        int max_action = 0;
-        for (int i = 1; i < num_actions; ++i) {
-            if (probs[i] > probs[max_action]) {
-                max_action = i;
+        std::vector<uint64_t> raw_probs(num_actions, 1);
+        get_action_probs(state, bucket, num_rounds, num_actions, raw_probs.data());
+
+        std::vector<double> prior = get_normalized_action_probs(raw_probs);
+
+        if (use_mcts) {
+            auto start = std::chrono::high_resolution_clock::now();
+            std::string new_state = state + "r";  // future state after raise
+            double fold_p = this->opp_fold_prob(new_state, bucket, num_rounds);
+
+            int action = mcts_agent->search(state, hand, num_actions, pot_size, call_amount, invested, prior, fold_p);
+            if (verbose) {
+                auto end = std::chrono::high_resolution_clock::now();
+                std::cout << "Simulation count: " << mcts_agent->get_simulation_count() << std::endl;
+                std::cout << "Time taken: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " ms" << std::endl;
+            }
+            if (action != -1) {
+                return action;
             }
         }
+
+        int max_action = std::distance(prior.begin(), std::max_element(prior.begin(), prior.end()));
         return max_action;
     }
+
 
 protected:
     int get_bucket(float equity, std::vector<float>& boundary) {
@@ -216,7 +226,42 @@ protected:
                 break;
         }
     }
+    std::vector<double> get_normalized_action_probs(const std::vector<uint64_t>& action_probs) {
+        assert(!action_probs.empty());
+        double total = std::accumulate(action_probs.begin(), action_probs.end(), 0.0);
+        std::vector<double> normalized(action_probs.size(), 1.0 / action_probs.size());
 
+        if (total > 0) {
+            for (size_t i = 0; i < action_probs.size(); ++i) {
+                normalized[i] = static_cast<double>(action_probs[i]) / total;
+            }
+        }
+        return normalized;
+    }
+    double opp_fold_prob(const std::string& state, int bucket, int round) const {
+        auto it = pos_table.find(state);
+        if (it == pos_table.end()) return 0.0;
+    
+        int p = it->second ^ 1;  // opponent position
+    
+        if (round == 1) {
+            // preflop is std::vector<uint64_t>
+            const uint64_t* row = &preflop[bucket * 21 + p];
+            double s = static_cast<double>(row[0]) + row[1] + row[2];
+            return s ? static_cast<double>(row[0]) / s : 0.0;
+        }
+    
+        // flop, turn, river are std::vector<uint32_t>
+        const uint32_t* row = nullptr;
+        if (round == 2) row = &flop[bucket * 182 + p];
+        else if (round == 3) row = &turn[bucket * 1512 + p];
+        else if (round == 4) row = &river[bucket * 8028 + p];
+        else return 0.0;
+    
+        double s = static_cast<double>(row[0]) + row[1] + row[2];
+        return s ? static_cast<double>(row[0]) / s : 0.0;
+    }
+    
     void load_strategy(const std::string& strategy_file) {
         preflop.resize(3549);
         flop.resize(910000);
@@ -284,6 +329,7 @@ protected:
         turn_bucket_file.read(reinterpret_cast<char*>(turn_bucket_table.data()), turn_bucket_table.size() * sizeof(float));
         river_bucket_file.read(reinterpret_cast<char*>(river_bucket_table.data()), river_bucket_table.size() * sizeof(float));
     }
+    std::unique_ptr<MCTSAgent> mcts_agent;
 
     std::vector<uint64_t> preflop;
     std::vector<uint32_t> flop;

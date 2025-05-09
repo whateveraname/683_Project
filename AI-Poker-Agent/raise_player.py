@@ -3,7 +3,7 @@ from time import sleep
 import pprint
 
 class RaisedPlayer(BasePokerPlayer):
-
+  over_limit_count = 0
   def declare_action(self, valid_actions, hole_card, round_state):
     for i in valid_actions:
         if i["action"] == "raise":

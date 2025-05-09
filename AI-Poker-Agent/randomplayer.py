@@ -3,7 +3,7 @@ import random as rand
 import pprint
 
 class RandomPlayer(BasePokerPlayer):
-
+  over_limit_count = 0
   def declare_action(self, valid_actions, hole_card, round_state):
     # valid_actions format => [raise_action_pp = pprint.PrettyPrinter(indent=2)
     #pp = pprint.PrettyPrinter(indent=2)
