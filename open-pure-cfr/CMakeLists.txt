@@ -24,10 +24,13 @@ add_definitions (-Wno-write-strings -Wno-sign-compare -Wno-unused-result)
 file(GLOB HAND_ISOMORPHISM_SOURCES hand-isomorphism/src/*.c)
 file(GLOB ACPC_SOURCES acpc_server_code/*.c)
 file(GLOB CFR_SOURCES ./*.cpp)
+file(GLOB OMP_SOURCES omp/*.cpp)
 
 add_library(C_Library OBJECT ${HAND_ISOMORPHISM_SOURCES} ${ACPC_SOURCES})
 set_target_properties(C_Library PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
+# set(PYBIND11_FINDPYTHON OFF)
+# set (PYTHON_EXECUTABLE "/mnt/nfs/work1/ameli/yanqichen/miniconda3/envs/py310/bin/python3")
 add_subdirectory(pybind11)
 
 # Define the executable
@@ -37,4 +40,4 @@ add_executable(print_player_strategy main/print_player_strategy.cpp ${CFR_SOURCE
 find_package(Threads REQUIRED)
 target_link_libraries(pure_cfr PRIVATE Threads::Threads)
 
-pybind11_add_module(strategy_parser python/mod.cpp ${CFR_SOURCES} $<TARGET_OBJECTS:C_Library>)
+pybind11_add_module(strategy_parser python/mod.cpp ${OMP_SOURCES} ${CFR_SOURCES} $<TARGET_OBJECTS:C_Library>)
