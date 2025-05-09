@@ -5,10 +5,13 @@
 #include <unordered_map>
 #include <cassert>
 #include <numeric>
+#include <cstdlib>
 
 extern "C" {
 #include "../hand-isomorphism/src/hand_index.h"
 }
+
+#include "../omp/EquityCalculator.h"
 
 #include <pybind11/pybind11.h>
 
@@ -16,10 +19,16 @@ namespace py = pybind11;
 
 class StrategyParser {
 public:
-    StrategyParser(const std::string& strategy_file, const std::string& pos_table_file, const std::string& bucket_table_path) {
+    StrategyParser(const std::string& strategy_file, const std::string& pos_table_file) {
+        int result = std::system("tar -xzvf strategy.tar.gz");
+        if (result == 0) {
+            std::cout << "Unzipped successfully.\n";
+        } else {
+            std::cerr << "Unzip failed.\n";
+        }
         load_strategy(strategy_file);
         load_pos_table(pos_table_file);
-        load_bucket_table(bucket_table_path);
+        load_bucket_table();
     }
 
     int parse(const std::string& state, const std::string& hand, int num_actions) {
@@ -50,6 +59,12 @@ public:
     }
 
 protected:
+    int get_bucket(float equity, std::vector<float>& boundary) {
+        auto it = std::lower_bound(boundary.begin(), boundary.end(), equity);
+        int index = it - boundary.begin();
+        return index;
+    }
+
     int hand_to_bucket(const std::string& hand, int round) {
         std::vector<uint8_t> cards(7);
         parse_hand(hand, round, cards.data());
@@ -60,16 +75,43 @@ protected:
             bucket = index;
             break;
         case 2:
-            flop_bucket_table.seekg(index * sizeof(int), std::ios::beg);
-            flop_bucket_table.read(reinterpret_cast<char*>(&bucket), sizeof(int));
+        {
+            std::array<uint8_t, 5> cards;
+            omp::EquityCalculator eq;
+            hand_unindex(&indexers[round - 1], 1, index, cards.data());
+            std::vector<omp::CardRange> hands{omp::CardRange({std::array<uint8_t, 2>{cards[0], cards[1]}}), {"random"}};
+            auto boards = omp::CardRange::getCardMask(std::vector<uint8_t>{cards[2], cards[3], cards[4]});
+            eq.start(hands, boards, 0, false, 5e-5, nullptr, 0, 1);
+            auto r = eq.getResults();
+            auto equity = r.equity[0];
+            bucket = get_bucket(equity, flop_bucket_table);
+        }
             break;
         case 3:
-            turn_bucket_table.seekg(index * sizeof(int), std::ios::beg);
-            turn_bucket_table.read(reinterpret_cast<char*>(&bucket), sizeof(int));
+        {
+            std::array<uint8_t, 6> cards;
+            omp::EquityCalculator eq;
+            hand_unindex(&indexers[round - 1], 2, index, cards.data());
+            std::vector<omp::CardRange> hands{omp::CardRange({std::array<uint8_t, 2>{cards[0], cards[1]}}), {"random"}};
+            auto boards = omp::CardRange::getCardMask(std::vector<uint8_t>{cards[2], cards[3], cards[4], cards[5]});
+            eq.start(hands, boards, 0, false, 5e-5, nullptr, 0, 1);
+            auto r = eq.getResults();
+            auto equity = r.equity[0];
+            bucket = get_bucket(equity, turn_bucket_table);
+        }
             break;
         case 4:
-            river_bucket_table.seekg(index * sizeof(int), std::ios::beg);
-            river_bucket_table.read(reinterpret_cast<char*>(&bucket), sizeof(int));
+        {
+            std::array<uint8_t, 7> cards;
+            omp::EquityCalculator eq;
+            hand_unindex(&indexers[round - 1], 3, index, cards.data());
+            std::vector<omp::CardRange> hands{omp::CardRange({std::array<uint8_t, 2>{cards[0], cards[1]}}), {"random"}};
+            auto boards = omp::CardRange::getCardMask(std::vector<uint8_t>{cards[2], cards[3], cards[4], cards[5], cards[6]});
+            eq.start(hands, boards, 0, false, 5e-5, nullptr, 0, 1);
+            auto r = eq.getResults();
+            auto equity = r.equity[0];
+            bucket = get_bucket(equity, river_bucket_table);
+        }
             break;
         default:
             break;
@@ -223,18 +265,24 @@ protected:
         file.close();
     }
 
-    void load_bucket_table(const std::string& bucket_table_path) {
+    void load_bucket_table() {
+        flop_bucket_table.resize(4999);
+        turn_bucket_table.resize(4999);
+        river_bucket_table.resize(4999);
         uint8_t cards_per_round[] = {2, 3, 1, 1};
         for (int i = 0; i < 4; i++) {
             hand_indexer_init(i + 1, cards_per_round, &indexers[i]);
         }
-        flop_bucket_table.open(bucket_table_path + "flop_bucket_table.bin", std::ios::binary);
-        if (!flop_bucket_table) {
-            std::cout << "Error opening file: flop_bucket_table.bin" << std::endl;
+        std::ifstream flop_bucket_file("flop_buckets.bin", std::ios::binary);
+        if (!flop_bucket_file) {
+            std::cout << "Error opening file: flop_buckets.bin" << std::endl;
             return;
         }
-        turn_bucket_table.open(bucket_table_path + "turn_bucket_table.bin", std::ios::binary);
-        river_bucket_table.open(bucket_table_path + "river_bucket_table.bin", std::ios::binary);
+        std::ifstream turn_bucket_file("turn_buckets.bin", std::ios::binary);
+        std::ifstream river_bucket_file("river_buckets.bin", std::ios::binary);
+        flop_bucket_file.read(reinterpret_cast<char*>(flop_bucket_table.data()), flop_bucket_table.size() * sizeof(float));
+        turn_bucket_file.read(reinterpret_cast<char*>(turn_bucket_table.data()), turn_bucket_table.size() * sizeof(float));
+        river_bucket_file.read(reinterpret_cast<char*>(river_bucket_table.data()), river_bucket_table.size() * sizeof(float));
     }
 
     std::vector<uint64_t> preflop;
@@ -245,13 +293,13 @@ protected:
     std::unordered_map<std::string, int> pos_table;
 
     hand_indexer_t indexers[MAX_ROUNDS];
-    std::ifstream flop_bucket_table;
-    std::ifstream turn_bucket_table;
-    std::ifstream river_bucket_table;
+    std::vector<float> flop_bucket_table;
+    std::vector<float> turn_bucket_table;
+    std::vector<float> river_bucket_table;
 };
 
 PYBIND11_MODULE(strategy_parser, m) {
     py::class_<StrategyParser>(m, "StrategyParser")
-        .def(py::init<const std::string&, const std::string&, const std::string&>())
+        .def(py::init<const std::string&, const std::string&>())
         .def("parse", &StrategyParser::parse);
 }
